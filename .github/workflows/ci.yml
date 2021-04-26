@@ -1,0 +1,40 @@
+name: ci
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: "Python ${{ matrix.python-version }} on ${{ matrix.os }}"
+    runs-on: "${{ matrix.os }}"
+
+    strategy:
+      matrix:
+        python-version: ["3.6", "3.7", "3.8", "3.9"]
+        os: [ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        set -xe
+        python -m pip install --upgrade pip
+        pip install flake8 pytest pytest-xdist yapf
+        pip install jax jaxlib
+        pip install -r requirements.txt
+        pip install -r requirements-test.txt
+    - name: Lint with flake8
+      run: |
+        set -xe
+        flake8 . --config=setup.cfg --count --statistics
+    - name: Check formatting with yapf
+      if: matrix.python-version != '3.6'
+      run: |
+        set -xe
+        yapf . --style=setup.cfg --recursive --diff
+    - name: Test with pytest
+      run: |
+        set -xe
+        pytest -n "$(grep -c ^processor /proc/cpuinfo)" hj_reachability
