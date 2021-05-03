@@ -28,7 +28,7 @@ class Air3d(dynamics.ControlAndDisturbanceAffineDynamics):
         v_a, v_b = self.evader_speed, self.pursuer_speed
         return jnp.array([-v_a + v_b * jnp.cos(psi), v_b * jnp.sin(psi), 0.])
 
-    def control_directions(self, state, time):
+    def control_jacobian(self, state, time):
         x, y, _ = state
         return jnp.array([
             [y],
@@ -36,7 +36,7 @@ class Air3d(dynamics.ControlAndDisturbanceAffineDynamics):
             [-1.],
         ])
 
-    def disturbance_directions(self, state, time):
+    def disturbance_jacobian(self, state, time):
         return jnp.array([
             [0.],
             [0.],

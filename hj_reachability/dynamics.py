@@ -53,27 +53,27 @@ class ControlAndDisturbanceAffineDynamics(Dynamics):
 
     def __call__(self, state, control, disturbance, time):
         """Implements the affine dynamics `dx_dt = f(x, t) + G_u(x, t) @ u + G_d(x, t) @ d`."""
-        return (self.open_loop_dynamics(state, time) + self.control_directions(state, time) @ control +
-                self.disturbance_directions(state, time) @ disturbance)
+        return (self.open_loop_dynamics(state, time) + self.control_jacobian(state, time) @ control +
+                self.disturbance_jacobian(state, time) @ disturbance)
 
     @abc.abstractmethod
     def open_loop_dynamics(self, state, time):
         """Implements the open loop dynamics `f(x, t)`."""
 
     @abc.abstractmethod
-    def control_directions(self, state, time):
-        """Implements the control directions `G_u(x, t)`."""
+    def control_jacobian(self, state, time):
+        """Implements the control Jacobian `G_u(x, t)`."""
 
     @abc.abstractmethod
-    def disturbance_directions(self, state, time):
-        """Implements the disturbance directions `G_d(x, t)`."""
+    def disturbance_jacobian(self, state, time):
+        """Implements the disturbance Jacobian `G_d(x, t)`."""
 
     def optimal_control_and_disturbance(self, state, time, grad_value):
         """Computes the optimal control and disturbance realized by the HJ PDE Hamiltonian."""
-        control_direction = grad_value @ self.control_directions(state, time)
+        control_direction = grad_value @ self.control_jacobian(state, time)
         if self.control_mode == "min":
             control_direction = -control_direction
-        disturbance_direction = grad_value @ self.disturbance_directions(state, time)
+        disturbance_direction = grad_value @ self.disturbance_jacobian(state, time)
         if self.disturbance_mode == "min":
             disturbance_direction = -disturbance_direction
         return (self.control_space.extreme_point(control_direction),
@@ -84,5 +84,5 @@ class ControlAndDisturbanceAffineDynamics(Dynamics):
         del value, grad_value_box  # unused
         # An overestimation; see Eq. (25) from https://www.cs.ubc.ca/~mitchell/ToolboxLS/toolboxLS-1.1.pdf.
         return (jnp.abs(self.open_loop_dynamics(state, time)) +
-                jnp.abs(self.control_directions(state, time)) @ self.control_space.max_magnitudes +
-                jnp.abs(self.disturbance_directions(state, time)) @ self.disturbance_space.max_magnitudes)
+                jnp.abs(self.control_jacobian(state, time)) @ self.control_space.max_magnitudes +
+                jnp.abs(self.disturbance_jacobian(state, time)) @ self.disturbance_space.max_magnitudes)
