@@ -1,10 +1,12 @@
 import dataclasses
+import functools
 
 import chex
 import jax.numpy as jnp
 import numpy as np
 
 from hj_reachability import boundary_conditions as _boundary_conditions
+from hj_reachability.finite_differences import upwind_first
 from hj_reachability import sets
 from hj_reachability import utils
 
@@ -21,7 +23,7 @@ class Grid:
         states: An `(N + 1)` dimensional array containing the state values at each grid location. The first `N`
             dimensions correspond to the location in the grid, while the last dimension (itself of size `N`) contains
             the state vector.
-        state_domain: A `Box` representing the domain of grid.
+        domain: A `Box` representing the domain of grid.
         coordinate_vectors: A tuple of `N` arrays containing the discrete state values in each dimension. The `states`
             attribute is produced by `stack`ing a `meshgrid` of these coordinate vectors.
         spacings: A tuple of `N` scalars containing the grid spacing (the difference between successive elements of the
@@ -31,21 +33,21 @@ class Grid:
             condition (e.g., periodic).
     """
     states: Array
-    state_domain: sets.Box
+    domain: sets.Box
     coordinate_vectors: Tuple[Array, ...]
     spacings: Tuple[Array, ...]
     boundary_conditions: Tuple[BoundaryCondition, ...]
 
     @classmethod
     def from_grid_definition_and_initial_values(cls,
-                                                state_domain: sets.Box,
+                                                domain: sets.Box,
                                                 shape: Tuple[int, ...],
                                                 boundary_conditions: Optional[Tuple[BoundaryCondition, ...]] = None,
                                                 periodic_dims: Optional[Union[int, Tuple[int, ...]]] = None) -> "Grid":
         """Constructs a `Grid` from a domain, shape, and boundary conditions.
 
         Args:
-            state_domain: A `Box` representing the domain of grid.
+            domain: A `Box` representing the domain of grid.
             shape: A tuple of `N` integers denoting the number of discretization nodes in each dimension.
             boundary_conditions: A tuple of `N` boundary conditions for each dimension. If not provided, defaults to
                 `extrapolate_away_from_zero` in each dimension, with the exception of those dimensions that appear in
@@ -66,10 +68,10 @@ class Grid:
 
         coordinate_vectors, spacings = zip(
             *(jnp.linspace(l, h, n, endpoint=bc is not _boundary_conditions.periodic, retstep=True)
-              for l, h, n, bc in zip(state_domain.lo, state_domain.hi, shape, boundary_conditions)))
+              for l, h, n, bc in zip(domain.lo, domain.hi, shape, boundary_conditions)))
         states = jnp.stack(jnp.meshgrid(*coordinate_vectors, indexing="ij"), -1)
 
-        return cls(states, state_domain, coordinate_vectors, spacings, boundary_conditions)
+        return cls(states, domain, coordinate_vectors, spacings, boundary_conditions)
 
     @property
     def ndim(self) -> int:
@@ -85,7 +87,7 @@ class Grid:
     def arrays(self) -> "GridArrays":
         """Returns the arrays that define the nodes of the grid."""
         return GridArrays(states=self.states,
-                          state_domain=self.state_domain,
+                          domain=self.domain,
                           coordinate_vectors=self.coordinate_vectors,
                           spacings=self.spacings)
 
@@ -100,11 +102,48 @@ class Grid:
         ])
         return (jnp.stack(left_derivatives, -1), jnp.stack(right_derivatives, -1))
 
+    def grad_values(self, values: Array, upwind_scheme: Optional[Callable] = None) -> Array:
+        """Returns a central difference-based approximation of `grad_values`."""
+        # TODO: Implement central difference schemes in `hj_reachability.finite_differences`.
+        if upwind_scheme is None:
+            upwind_scheme = upwind_first.first_order
+        return sum(self.upwind_grad_values(upwind_scheme, values)) / 2
+
+    def position(self, state: Array) -> Array:
+        """Returns an array of `float`s corresponding to the position of `state` in the grid."""
+        position = (state - self.domain.lo) / jnp.array(self.spacings)
+        return jnp.where(self._is_periodic_dim, position % np.array(self.shape), position)
+
+    def nearest_index(self, state: Array) -> Array:
+        """Returns the result of rounding `self.position(state)` to the nearest grid index."""
+        return jnp.round(self.position(state)).astype(jnp.int32)
+
+    def interpolate(self, values, state):
+        """Interpolates `values` (possibly multidimensional per node) defined over the grid at the given `state`."""
+        position = (state - self.domain.lo) / jnp.array(self.spacings)
+        index_lo = jnp.floor(position).astype(jnp.int32)
+        index_hi = index_lo + 1
+        weight_hi = position - index_lo
+        weight_lo = 1 - weight_hi
+        index_lo, index_hi = tuple(
+            jnp.where(self._is_periodic_dim, index % np.array(self.shape), jnp.clip(index, 0, np.array(self.shape)))
+            for index in (index_lo, index_hi))
+        weight = functools.reduce(lambda x, y: x * y, jnp.ix_(*jnp.stack([weight_lo, weight_hi], -1)))
+        # TODO: Double-check numerical stability here and/or switch to `tuple`s and `itertools.product` for clarity.
+        return jnp.sum(
+            weight[(...,) + (np.newaxis,) * (values.ndim - self.ndim)] *
+            values[jnp.ix_(*jnp.stack([index_lo, index_hi], -1))], list(range(self.ndim)))
+
+    @property
+    def _is_periodic_dim(self) -> Array:
+        """Returns a boolean vector indicating which dimensions (if any) are periodic."""
+        return np.array([bc is _boundary_conditions.periodic for bc in self.boundary_conditions])
+
 
 @chex.dataclass(frozen=True)
 class GridArrays:
     """Arrays that define the nodes of a `Grid`; see the `Grid` docstring for more details."""
     states: Array
-    state_domain: sets.Box
+    domain: sets.Box
     coordinate_vectors: Tuple[Array, ...]
     spacings: Tuple[float, ...]
