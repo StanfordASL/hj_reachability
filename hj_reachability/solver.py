@@ -1,9 +1,9 @@
 import contextlib
 import dataclasses
 import functools
-import warnings
 
 import jax
+import jax.experimental.host_callback
 import jax.numpy as jnp
 import numpy as np
 
@@ -44,68 +44,76 @@ class SolverSettings:
         return cls(upwind_scheme=upwind_scheme, time_integrator=time_integrator, **kwargs)
 
 
-def step(solver_settings, dynamics, grid, time, values, target_time, progress_bar=False, compile_loop=True):
-    if compile_loop and not progress_bar:
-        return _step(solver_settings, dynamics, grid.boundary_conditions, grid.arrays, time, values, target_time)
-    if compile_loop and progress_bar:
-        # TODO: Look into `jax.experimental.host_callback` for progress monitoring under `jax.jit`.
-        warnings.warn("The option `progress_bar=True` is incompatible with (and overrides) `compile_loop=True`.")
-    with (_try_get_progress_bar(np.abs(target_time - time)) if progress_bar else contextlib.nullcontext()) as bar:
-        initial_time = time
-        while np.abs(target_time - time) > 0:
-            time, values = solver_settings.time_integrator(solver_settings, dynamics, grid, time, values, target_time)
-            if bar is not None:
-                bar.update(np.abs(time - initial_time) - bar.n)
-    return values
+def step(solver_settings, dynamics, grid, time, values, target_time, progress_bar=True):
+    return _step(solver_settings, dynamics, grid.boundary_conditions, progress_bar, grid.arrays, time, values,
+                 target_time)
 
 
-@functools.partial(jax.jit, static_argnums=(0, 1, 2))
-def _step(solver_settings, dynamics, boundary_conditions, grid_arrays, time, values, target_time):
+@functools.partial(jax.jit, static_argnums=(0, 1, 2, 3))
+def _step(solver_settings, dynamics, boundary_conditions, progress_bar, grid_arrays, time, values, target_time):
     grid = _grid.Grid(**grid_arrays, boundary_conditions=boundary_conditions)
-    return jax.lax.while_loop(
-        lambda time_values: jnp.abs(target_time - time_values[0]) > 0,
-        lambda time_values: solver_settings.time_integrator(solver_settings, dynamics, grid, *time_values, target_time),
-        (time, values))[1]
+    with (_try_get_progress_bar(time, target_time)
+          if progress_bar is True else contextlib.nullcontext(progress_bar)) as bar:
+
+        def sub_step(time_values):
+            t, v = solver_settings.time_integrator(solver_settings, dynamics, grid, *time_values, target_time)
+            if bar is not False:
+                bar.update_to(jnp.abs(t - bar.reference_time))
+            return t, v
+
+        return jax.lax.while_loop(lambda time_values: jnp.abs(target_time - time_values[0]) > 0, sub_step,
+                                  (time, values))[1]
 
 
-def solve(solver_settings, dynamics, grid, times, initial_values, progress_bar=False, compile_loop=True):
-    if compile_loop and not progress_bar:
-        return _solve(solver_settings, dynamics, grid.boundary_conditions, grid.arrays, times, initial_values)
-    if compile_loop and progress_bar:
-        # TODO: Look into `jax.experimental.host_callback` for progress monitoring under `jax.jit`.
-        warnings.warn("The option `progress_bar=True` is incompatible with (and overrides) `compile_loop=True`.")
-    with (_try_get_progress_bar(np.abs(times[-1] - times[0])) if progress_bar else contextlib.nullcontext()) as bar:
-        all_values = [initial_values]
-        time, values = times[0], initial_values
-        for target_time in times[1:]:
-            while np.abs(target_time - time) > 0:
-                time, values = solver_settings.time_integrator(solver_settings, dynamics, grid, time, values,
-                                                               target_time)
-                if bar is not None:
-                    bar.update(np.abs(time - times[0]) - bar.n)
-            all_values.append(values)
-    return jnp.stack(all_values)
+def solve(solver_settings, dynamics, grid, times, initial_values, progress_bar=True):
+    return _solve(solver_settings, dynamics, grid.boundary_conditions, progress_bar, grid.arrays, times, initial_values)
 
 
-@functools.partial(jax.jit, static_argnums=(0, 1, 2))
-def _solve(solver_settings, dynamics, boundary_conditions, grid_arrays, times, initial_values):
+@functools.partial(jax.jit, static_argnums=(0, 1, 2, 3))
+def _solve(solver_settings, dynamics, boundary_conditions, progress_bar, grid_arrays, times, initial_values):
     grid = _grid.Grid(**grid_arrays, boundary_conditions=boundary_conditions)
-    helper = lambda t, v: ((t, v), v)
-    return jnp.concatenate([
-        initial_values[np.newaxis],
-        jax.lax.scan(
-            lambda time_values, target_time: helper(target_time,
-                                                    step(solver_settings, dynamics, grid, *time_values, target_time)),
-            (times[0], initial_values), times[1:])[1]
-    ])
+    with (_try_get_progress_bar(times[0], times[-1])
+          if progress_bar is True else contextlib.nullcontext(progress_bar)) as bar:
+        make_carry_and_output_slice = lambda t, v: ((t, v), v)
+        return jnp.concatenate([
+            initial_values[np.newaxis],
+            jax.lax.scan(
+                lambda time_values, target_time: make_carry_and_output_slice(
+                    target_time, step(solver_settings, dynamics, grid, *time_values, target_time, bar)),
+                (times[0], initial_values), times[1:])[1]
+        ])
 
 
-def _try_get_progress_bar(total):
+def _try_get_progress_bar(reference_time, target_time):
     try:
         import tqdm
     except ImportError:
         raise ImportError("The option `progress_bar=True` requires the 'tqdm' package to be installed.")
-    return tqdm.tqdm(total=total,
-                     unit="sim_s",
-                     bar_format="{l_bar}{bar}| {n:7.4f}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
-                     ascii=True)
+    return TqdmWrapper(tqdm,
+                       reference_time,
+                       total=jnp.abs(target_time - reference_time),
+                       unit="sim_s",
+                       bar_format="{l_bar}{bar}| {n:7.4f}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
+                       ascii=True)
+
+
+class TqdmWrapper:
+
+    def __init__(self, tqdm, reference_time, total, *args, **kwargs):
+        self.reference_time = reference_time
+        jax.experimental.host_callback.id_tap(lambda total, __: self._create_tqdm(tqdm, total, *args, **kwargs), total)
+
+    def _create_tqdm(self, tqdm, total, *args, **kwargs):
+        self._tqdm = tqdm.tqdm(total=total, *args, **kwargs)
+
+    def update_to(self, n):
+        return jax.experimental.host_callback.id_tap(lambda n, __: self._tqdm.update(n - self._tqdm.n), n)
+
+    def close(self):
+        return jax.experimental.host_callback.id_tap(lambda _, __: self._tqdm.close(), None)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
