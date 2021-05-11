@@ -15,8 +15,11 @@ from hj_reachability.finite_differences import upwind_first
 from typing import Callable, Text
 
 # Hamiltonian postprocessors.
-identity = lambda x: x
+identity = lambda *x: x[-1]  # Returns the last argument so that this may also be used as a value postprocessor.
 backwards_reachable_tube = lambda x: jnp.minimum(x, 0)
+
+# Value postprocessors.
+static_obstacle = lambda obstacle: (lambda t, v: jnp.maximum(v, obstacle))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -25,6 +28,7 @@ class SolverSettings:
     artificial_dissipation_scheme: Callable = artificial_dissipation.global_lax_friedrichs
     hamiltonian_postprocessor: Callable = identity
     time_integrator: Callable = time_integration.third_order_total_variation_diminishing_runge_kutta
+    value_postprocessor: Callable = identity
     CFL_number: float = 0.75
 
     @classmethod

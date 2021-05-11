@@ -37,18 +37,20 @@ def _euler_step(solver_settings, dynamics, boundary_conditions, grid_arrays, tim
     if time_step is None:
         time_step_bound = 1 / jnp.max(jnp.sum(dissipation_coefficients / jnp.array(grid.spacings), -1))
         time_step = time_direction * jnp.minimum(solver_settings.CFL_number * time_step_bound, jnp.abs(max_time_step))
+    # TODO: Think carefully about whether `solver_settings.value_postprocessor` should be applied here instead.
     return time + time_step, values + time_step * dvalues_dt
 
 
 def first_order_total_variation_diminishing_runge_kutta(solver_settings, dynamics, grid, time, values, target_time):
-    return euler_step(solver_settings, dynamics, grid, time, values, max_time_step=target_time - time)
+    time_1, values_1 = euler_step(solver_settings, dynamics, grid, time, values, max_time_step=target_time - time)
+    return time_1, solver_settings.value_postprocessor(time_1, values_1)
 
 
 def second_order_total_variation_diminishing_runge_kutta(solver_settings, dynamics, grid, time, values, target_time):
     time_1, values_1 = euler_step(solver_settings, dynamics, grid, time, values, max_time_step=target_time - time)
     time_step = time_1 - time
     _, values_2 = euler_step(solver_settings, dynamics, grid, time_1, values_1, time_step)
-    return time_1, (values + values_2) / 2
+    return time_1, solver_settings.value_postprocessor(time_1, (values + values_2) / 2)
 
 
 def third_order_total_variation_diminishing_runge_kutta(solver_settings, dynamics, grid, time, values, target_time):
@@ -57,4 +59,4 @@ def third_order_total_variation_diminishing_runge_kutta(solver_settings, dynamic
     _, values_2 = euler_step(solver_settings, dynamics, grid, time_1, values_1, time_step)
     time_0_5, values_0_5 = time + time_step / 2, (3 / 4) * values + (1 / 4) * values_2
     _, values_1_5 = euler_step(solver_settings, dynamics, grid, time_0_5, values_0_5, time_step)
-    return time_1, (1 / 3) * values + (2 / 3) * values_1_5
+    return time_1, solver_settings.value_postprocessor(time_1, (1 / 3) * values + (2 / 3) * values_1_5)
