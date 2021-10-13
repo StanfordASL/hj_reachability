@@ -32,13 +32,13 @@ def weighted_essentially_non_oscillatory(eno_order: int, values: Array, spacing:
 
     values = boundary_condition(values, eno_order)
     diffs = (values[1:] - values[:-1]) / spacing
+
+    if eno_order == 1:
+        return (diffs[:-1], diffs[1:])
+
     substencil_approximations = tuple(
         _unrolled_correlate(diffs[i:len(diffs) - eno_order + i], c)
         for (i, c) in enumerate(_diff_coefficients(eno_order)))
-
-    if eno_order == 1:
-        return substencil_approximations
-
     diffs2 = diffs[1:] - diffs[:-1]
     smoothness_indicators = [
         sum(
@@ -54,9 +54,55 @@ def weighted_essentially_non_oscillatory(eno_order: int, values: Array, spacing:
         sum(unnormalized_weights) for (i, unnormalized_weights) in enumerate(left_and_right_unnormalized_weights))
 
 
+def essentially_non_oscillatory(order: int, values: Array, spacing: float,
+                                boundary_condition: Callable[[Array, int], Array]) -> Tuple[Array, Array]:
+    """Implements an upwind essentially non-oscillatory (ENO) scheme for first derivative approximation.
+
+    Args:
+        order: The desired order of accuracy for the ENO scheme.
+        values: 1-dimensional array of function values assumed to be evaluated at a uniform grid in the domain.
+        spacing: Grid spacing of the `values`.
+        boundary_condition: A function used to pad `values` to implement a boundary condition (e.g., periodic).
+
+    Returns:
+        A tuple of arrays `(left_derivatives, right_derivatives)` each the same shape as `values` which contain,
+        respectively, left and right approximations of the first derivative at the grid points of `values`.
+    """
+    if order < 1:
+        raise ValueError(f"`order` must be at least 1; got {order}.")
+
+    values = boundary_condition(values, order)
+    diffs = (values[1:] - values[:-1]) / spacing
+
+    if order == 1:
+        return (diffs[:-1], diffs[1:])
+
+    substencil_approximations = tuple(
+        _unrolled_correlate(diffs[i:len(diffs) - order + i], c) for (i, c) in enumerate(_diff_coefficients(order)))
+
+    undivided_differences = []
+    for i in range(2, order):
+        diffs = diffs[1:] - diffs[:-1]
+        undivided_differences.append(diffs[order - i:i - order])
+
+    abs_diffs = jnp.abs(diffs[1:] - diffs[:-1])
+    stencil_indices = abs_diffs[1:] < abs_diffs[:-1]
+    for diffs in reversed(undivided_differences):
+        abs_diffs = jnp.abs(diffs)
+        stencil_indices = jnp.where(abs_diffs[1:] < abs_diffs[:-1], stencil_indices[1:] + 1, stencil_indices[:-1])
+
+    return (jnp.select([stencil_indices[:-1] == i for i in range(order - 1)], substencil_approximations[:-2],
+                       substencil_approximations[-2]),
+            jnp.select([stencil_indices[1:] == i for i in range(order - 1)], substencil_approximations[1:-1],
+                       substencil_approximations[-1]))
+
+
 first_order = WENO1 = functools.partial(weighted_essentially_non_oscillatory, 1)
 WENO3 = functools.partial(weighted_essentially_non_oscillatory, 2)
 WENO5 = functools.partial(weighted_essentially_non_oscillatory, 3)
+ENO1 = functools.partial(essentially_non_oscillatory, 1)
+ENO2 = functools.partial(essentially_non_oscillatory, 2)
+ENO3 = functools.partial(essentially_non_oscillatory, 3)
 
 
 def _weighted_essentially_non_oscillatory_vectorized(
@@ -68,12 +114,12 @@ def _weighted_essentially_non_oscillatory_vectorized(
 
     values = boundary_condition(values, eno_order)
     diffs = (values[1:] - values[:-1]) / spacing
-    substencil_approximations = _align_substencil_values(
-        jax.vmap(jnp.correlate, (None, 0), 0)(diffs, _diff_coefficients(eno_order)), jnp)
 
     if eno_order == 1:
-        return tuple(substencil_approximations)
+        return (diffs[:-1], diffs[1:])
 
+    substencil_approximations = _align_substencil_values(
+        jax.vmap(jnp.correlate, (None, 0), 0)(diffs, _diff_coefficients(eno_order)), jnp)
     diffs2 = diffs[1:] - diffs[:-1]
     chol_T = jnp.asarray(np.linalg.cholesky(_smoothness_indicator_quad_form(eno_order)).swapaxes(-1, -2))
     smoothness_indicators = _align_substencil_values(

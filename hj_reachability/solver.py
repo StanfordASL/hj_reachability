@@ -37,7 +37,7 @@ class SolverSettings:
             upwind_scheme = upwind_first.first_order
             time_integrator = time_integration.first_order_total_variation_diminishing_runge_kutta
         elif accuracy == "medium":
-            upwind_scheme = upwind_first.WENO3
+            upwind_scheme = upwind_first.ENO2
             time_integrator = time_integration.second_order_total_variation_diminishing_runge_kutta
         elif accuracy == "high":
             upwind_scheme = upwind_first.WENO3

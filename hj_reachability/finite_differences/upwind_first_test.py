@@ -13,9 +13,9 @@ class UpwindFirstTest(absltest.TestCase):
 
     def test_weighted_essentially_non_oscillatory(self):
 
-        def _WENO5(values, step, boundary_condition):
+        def _WENO5(values, spacing, boundary_condition):
             values = boundary_condition(values, 3)
-            diffs = (values[1:] - values[:-1]) / step
+            diffs = (values[1:] - values[:-1]) / spacing
 
             def compute_weno(v):
                 phi = [
@@ -34,20 +34,63 @@ class UpwindFirstTest(absltest.TestCase):
                     compute_weno([diffs[5 - i:None if i == 0 else -i] for i in range(5)]))
 
         values = np.random.rand(1000)
-        step = 0.1
-        np.testing.assert_allclose(upwind_first.WENO5(values, step, boundary_conditions.periodic),
-                                   _WENO5(values, step, boundary_conditions.periodic),
-                                   atol=1e-5)
+        spacing = 0.1
+        jax.tree_multimap(lambda x, y: np.testing.assert_allclose(x, y, atol=1e-5),
+                          upwind_first.WENO5(values, spacing, boundary_conditions.periodic),
+                          _WENO5(values, spacing, boundary_conditions.periodic))
+
+    def test_essentially_non_oscillatory(self):
+
+        def _brute_force_essentially_non_oscillatory(order, values, spacing, boundary_condition):
+
+            def _divided_difference(x, i, spacing=1):
+                if isinstance(i, int):
+                    return x[i]
+                order = len(i) - 1
+                return np.diff(x[i], order)[0] / (np.math.factorial(order) * spacing**order)
+
+            v = np.array(boundary_condition(values, order))
+            x = np.arange(len(v)) * spacing
+
+            p = [np.poly1d(v[i]) for i in range(order - 1, len(v) - order)]
+            ks = []
+            for i in range(len(p)):
+                j = i + order - 1
+                p[i] += _divided_difference(v, [j, j + 1], spacing) * np.poly1d([x[j]], True)
+                k = j
+                for d in range(2, order + 1):
+                    a = _divided_difference(v, np.arange(k, k + d + 1), spacing)
+                    b = _divided_difference(v, np.arange(k - 1, k + d), spacing)
+                    if np.abs(a) >= np.abs(b):
+                        c = b
+                        k_next = k - 1
+                    else:
+                        c = a
+                        k_next = k
+                    p[i] += c * np.poly1d(x[k:k + d], True)
+                    k = k_next
+                ks.append(k - j)
+            p_x = [np.polyder(f) for f in p]
+            return (np.array([np.polyval(f, x) for (f, x) in zip(p_x[:-1], x[order:-order])]),
+                    np.array([np.polyval(f, x) for (f, x) in zip(p_x[1:], x[order:-order])]))
+
+        values = np.random.rand(1000)
+        spacing = 0.1
+        for order in range(1, 5):
+            jax.tree_multimap(
+                lambda x, y: np.testing.assert_allclose(x, y, atol=1e-5),
+                upwind_first.essentially_non_oscillatory(order, values, spacing, boundary_conditions.periodic),
+                _brute_force_essentially_non_oscillatory(order, values, spacing, boundary_conditions.periodic))
 
     def test_weighted_essentially_non_oscillatory_vectorized(self):
         values = np.random.rand(1000)
-        step = 0.1
-        for eno_order in range(1, 3):
+        spacing = 0.1
+        for eno_order in range(1, 5):
             jax.tree_multimap(
-                lambda x, y: np.testing.assert_allclose(x, y, atol=1e-6),
-                upwind_first.weighted_essentially_non_oscillatory(eno_order, values, step,
+                lambda x, y: np.testing.assert_allclose(x, y, atol=1e-5),
+                upwind_first.weighted_essentially_non_oscillatory(eno_order, values, spacing,
                                                                   boundary_conditions.periodic),
-                upwind_first._weighted_essentially_non_oscillatory_vectorized(eno_order, values, step,
+                upwind_first._weighted_essentially_non_oscillatory_vectorized(eno_order, values, spacing,
                                                                               boundary_conditions.periodic))
 
     def test_diff_coefficients(self):
