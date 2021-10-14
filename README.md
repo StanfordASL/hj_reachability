@@ -13,13 +13,12 @@ To accommodate different [JAX] versions (i.e., CPU-only vs. JAX with GPU support
 
 Then, install this package using pip:
 ```
-pip install --upgrade git+https://github.com/StanfordASL/hj_reachability
+pip install --upgrade hj_reachability
 ```
 
 ## TODOs
 Aside from the specific TODOs scattered throughout the codebase, a few general TODOs:
 - Single-line docstrings (at a bare minimum) for everything. Test coverage, book/paper references, and proper documentation to come... eventually.
-- Register on [PyPI](https://pypi.org/)? Might be prudent to change the package name (e.g., to `hjax`) in that case.
 - Look into using `jax.pmap`/`jax.lax.ppermute` for multi-device parallelism; see, e.g., [jax demo notebooks](https://github.com/google/jax/tree/master/cloud_tpu_colabs).
 - Incorporate neural-network-based PDE solvers; see, e.g., [Bansal, S. and Tomlin, C. "DeepReach: A Deep Learning Approach to High-Dimensional Reachability." (2020)](https://arxiv.org/abs/2011.02082).
 
