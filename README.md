@@ -13,7 +13,7 @@ To accommodate different [JAX] versions (i.e., CPU-only vs. JAX with GPU support
 
 Then, install this package using pip:
 ```
-pip install --upgrade hj_reachability
+pip install --upgrade hj-reachability
 ```
 
 ## TODOs
