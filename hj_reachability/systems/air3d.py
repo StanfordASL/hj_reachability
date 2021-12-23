@@ -18,9 +18,9 @@ class Air3d(dynamics.ControlAndDisturbanceAffineDynamics):
         self.evader_speed = evader_speed
         self.pursuer_speed = pursuer_speed
         if control_space is None:
-            control_space = sets.Box(lo=jnp.array([-evader_max_turn_rate]), hi=jnp.array([evader_max_turn_rate]))
+            control_space = sets.Box(jnp.array([-evader_max_turn_rate]), jnp.array([evader_max_turn_rate]))
         if disturbance_space is None:
-            disturbance_space = sets.Box(lo=jnp.array([-pursuer_max_turn_rate]), hi=jnp.array([pursuer_max_turn_rate]))
+            disturbance_space = sets.Box(jnp.array([-pursuer_max_turn_rate]), jnp.array([pursuer_max_turn_rate]))
         super().__init__(control_mode, disturbance_mode, control_space, disturbance_space)
 
     def open_loop_dynamics(self, state, time):

@@ -1,14 +1,13 @@
 import contextlib
-import dataclasses
 import functools
 
+from flax import struct
 import jax
 import jax.experimental.host_callback
 import jax.numpy as jnp
 import numpy as np
 
 from hj_reachability import artificial_dissipation
-from hj_reachability import grid as _grid
 from hj_reachability import time_integration
 from hj_reachability.finite_differences import upwind_first
 
@@ -32,13 +31,28 @@ backwards_reachable_tube = lambda x: jnp.minimum(x, 0)
 static_obstacle = lambda obstacle: (lambda t, v: jnp.maximum(v, obstacle))
 
 
-@dataclasses.dataclass(frozen=True)
+@struct.dataclass
 class SolverSettings:
-    upwind_scheme: Callable = upwind_first.WENO5
-    artificial_dissipation_scheme: Callable = artificial_dissipation.global_lax_friedrichs
-    hamiltonian_postprocessor: Callable = identity
-    time_integrator: Callable = time_integration.third_order_total_variation_diminishing_runge_kutta
-    value_postprocessor: Callable = identity
+    upwind_scheme: Callable = struct.field(
+        default=upwind_first.WENO5,
+        pytree_node=False,
+    )
+    artificial_dissipation_scheme: Callable = struct.field(
+        default=artificial_dissipation.global_lax_friedrichs,
+        pytree_node=False,
+    )
+    hamiltonian_postprocessor: Callable = struct.field(
+        default=identity,
+        pytree_node=False,
+    )
+    time_integrator: Callable = struct.field(
+        default=time_integration.third_order_total_variation_diminishing_runge_kutta,
+        pytree_node=False,
+    )
+    value_postprocessor: Callable = struct.field(
+        default=identity,
+        pytree_node=False,
+    )
     CFL_number: float = 0.75
 
     @classmethod
@@ -58,14 +72,8 @@ class SolverSettings:
         return cls(upwind_scheme=upwind_scheme, time_integrator=time_integrator, **kwargs)
 
 
+@functools.partial(jax.jit, static_argnames=("dynamics", "progress_bar"))
 def step(solver_settings, dynamics, grid, time, values, target_time, progress_bar=True):
-    return _step(solver_settings, dynamics, grid.boundary_conditions, progress_bar, grid.arrays, time, values,
-                 target_time)
-
-
-@functools.partial(jax.jit, static_argnums=(0, 1, 2, 3))
-def _step(solver_settings, dynamics, boundary_conditions, progress_bar, grid_arrays, time, values, target_time):
-    grid = _grid.Grid(**grid_arrays, boundary_conditions=boundary_conditions)
     with (_try_get_progress_bar(time, target_time) if progress_bar is True else nullcontext(progress_bar)) as bar:
 
         def sub_step(time_values):
@@ -78,13 +86,8 @@ def _step(solver_settings, dynamics, boundary_conditions, progress_bar, grid_arr
                                   (time, values))[1]
 
 
+@functools.partial(jax.jit, static_argnames=("dynamics", "progress_bar"))
 def solve(solver_settings, dynamics, grid, times, initial_values, progress_bar=True):
-    return _solve(solver_settings, dynamics, grid.boundary_conditions, progress_bar, grid.arrays, times, initial_values)
-
-
-@functools.partial(jax.jit, static_argnums=(0, 1, 2, 3))
-def _solve(solver_settings, dynamics, boundary_conditions, progress_bar, grid_arrays, times, initial_values):
-    grid = _grid.Grid(**grid_arrays, boundary_conditions=boundary_conditions)
     with (_try_get_progress_bar(times[0], times[-1]) if progress_bar is True else nullcontext(progress_bar)) as bar:
         make_carry_and_output_slice = lambda t, v: ((t, v), v)
         return jnp.concatenate([

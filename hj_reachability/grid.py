@@ -1,7 +1,6 @@
-import dataclasses
 import functools
 
-import chex
+from flax import struct
 import jax.numpy as jnp
 import numpy as np
 
@@ -10,12 +9,13 @@ from hj_reachability.finite_differences import upwind_first
 from hj_reachability import sets
 from hj_reachability import utils
 
-from chex import Array
-from typing import Callable, Optional, Tuple, Union
+from typing import Any, Callable, Optional, Tuple, Union
 from hj_reachability.boundary_conditions import BoundaryCondition
 
+Array = Any
 
-@dataclasses.dataclass(frozen=True)
+
+@struct.dataclass
 class Grid:
     """Class for representing Cartesian state grids with uniform spacing in each dimension.
 
@@ -36,7 +36,7 @@ class Grid:
     domain: sets.Box
     coordinate_vectors: Tuple[Array, ...]
     spacings: Tuple[Array, ...]
-    boundary_conditions: Tuple[BoundaryCondition, ...]
+    boundary_conditions: Tuple[BoundaryCondition, ...] = struct.field(pytree_node=False)
 
     @classmethod
     def from_grid_definition_and_initial_values(cls,
@@ -82,14 +82,6 @@ class Grid:
     def shape(self) -> Tuple[int, ...]:
         """Returns the shape of the grid, a tuple of `N` integers."""
         return self.states.shape[:-1]
-
-    @property
-    def arrays(self) -> "GridArrays":
-        """Returns the arrays that define the nodes of the grid."""
-        return GridArrays(states=self.states,
-                          domain=self.domain,
-                          coordinate_vectors=self.coordinate_vectors,
-                          spacings=self.spacings)
 
     def upwind_grad_values(self, upwind_scheme: Callable, values: Array) -> Tuple[Array, Array]:
         """Returns `(left_grad_values, right_grad_values)`."""
@@ -138,12 +130,3 @@ class Grid:
     def _is_periodic_dim(self) -> Array:
         """Returns a boolean vector indicating which dimensions (if any) are periodic."""
         return np.array([bc is _boundary_conditions.periodic for bc in self.boundary_conditions])
-
-
-@chex.dataclass(frozen=True)
-class GridArrays:
-    """Arrays that define the nodes of a `Grid`; see the `Grid` docstring for more details."""
-    states: Array
-    domain: sets.Box
-    coordinate_vectors: Tuple[Array, ...]
-    spacings: Tuple[float, ...]

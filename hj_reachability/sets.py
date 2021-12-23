@@ -1,12 +1,14 @@
 import abc
 
-import chex
+from flax import struct
 import jax.numpy as jnp
 
-from chex import Array
+from typing import Any
+
+Array = Any
 
 
-@chex.dataclass(frozen=True)
+@struct.dataclass
 class BoundedSet(metaclass=abc.ABCMeta):
     """Abstract base class for representing bounded subsets of Euclidean space."""
 
@@ -30,7 +32,7 @@ class BoundedSet(metaclass=abc.ABCMeta):
         return self.bounding_box.ndim
 
 
-@chex.dataclass(frozen=True)
+@struct.dataclass
 class Box(BoundedSet):
     """Class for representing axis-aligned boxes."""
     lo: Array
@@ -51,7 +53,7 @@ class Box(BoundedSet):
         return self.lo.shape[-1]
 
 
-@chex.dataclass(frozen=True)
+@struct.dataclass
 class Ball(BoundedSet):
     """Class for representing Euclidean (L2) balls."""
     center: Array
@@ -64,4 +66,4 @@ class Ball(BoundedSet):
     @property
     def bounding_box(self) -> "Box":
         """Returns an axis-aligned bounding box for the set."""
-        return Box(lo=self.center - self.radius, hi=self.center + self.radius)
+        return Box(self.center - jnp.expand_dims(self.radius, -1), self.center + jnp.expand_dims(self.radius, -1))

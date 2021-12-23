@@ -1,7 +1,8 @@
 import jax.numpy as jnp
 
-from chex import Array
-from typing import Callable
+from typing import Any, Callable
+
+Array = Any
 
 BoundaryCondition = Callable[[Array, int], Array]
 

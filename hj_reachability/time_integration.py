@@ -4,7 +4,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from hj_reachability import grid as _grid
 from hj_reachability import utils
 
 
@@ -15,14 +14,8 @@ def lax_friedrichs_numerical_hamiltonian(hamiltonian, state, time, value, left_g
     return hamiltonian_value - dissipation_value
 
 
+@functools.partial(jax.jit, static_argnames="dynamics")
 def euler_step(solver_settings, dynamics, grid, time, values, time_step=None, max_time_step=None):
-    return _euler_step(solver_settings, dynamics, grid.boundary_conditions, grid.arrays, time, values, time_step,
-                       max_time_step)
-
-
-@functools.partial(jax.jit, static_argnums=(0, 1, 2))
-def _euler_step(solver_settings, dynamics, boundary_conditions, grid_arrays, time, values, time_step, max_time_step):
-    grid = _grid.Grid(**grid_arrays, boundary_conditions=boundary_conditions)
     time_direction = jnp.sign(max_time_step) if time_step is None else jnp.sign(time_step)
     signed_hamiltonian = lambda *args, **kwargs: time_direction * dynamics.hamiltonian(*args, **kwargs)
     left_grad_values, right_grad_values = grid.upwind_grad_values(solver_settings.upwind_scheme, values)

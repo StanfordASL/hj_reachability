@@ -10,8 +10,8 @@ class SolverTest(absltest.TestCase):
         np.random.seed(0)
         solver_settings = hj.SolverSettings.with_accuracy("low")
         dynamics = hj.systems.Air3d()
-        grid = hj.Grid.from_grid_definition_and_initial_values(hj.sets.Box(lo=np.array([-6., -10., 0.]),
-                                                                           hi=np.array([20., 10., 2 * np.pi])),
+        grid = hj.Grid.from_grid_definition_and_initial_values(hj.sets.Box(np.array([-6., -10., 0.]),
+                                                                           np.array([20., 10., 2 * np.pi])),
                                                                (11, 10, 10),
                                                                periodic_dims=2)
         self.problem_definition = {

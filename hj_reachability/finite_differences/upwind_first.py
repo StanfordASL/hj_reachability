@@ -5,9 +5,10 @@ import jax.numpy as jnp
 import numpy as np
 import numpy.polynomial.polynomial as poly
 
-from chex import Array
 from types import ModuleType
-from typing import Callable, Optional, Tuple
+from typing import Any, Callable, Optional, Tuple
+
+Array = Any
 
 WENO_EPS = 1e-6
 
