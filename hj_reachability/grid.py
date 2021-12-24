@@ -39,11 +39,12 @@ class Grid:
     boundary_conditions: Tuple[BoundaryCondition, ...] = struct.field(pytree_node=False)
 
     @classmethod
-    def from_grid_definition_and_initial_values(cls,
-                                                domain: sets.Box,
-                                                shape: Tuple[int, ...],
-                                                boundary_conditions: Optional[Tuple[BoundaryCondition, ...]] = None,
-                                                periodic_dims: Optional[Union[int, Tuple[int, ...]]] = None) -> "Grid":
+    def from_lattice_parameters_and_boundary_conditions(
+            cls,
+            domain: sets.Box,
+            shape: Tuple[int, ...],
+            boundary_conditions: Optional[Tuple[BoundaryCondition, ...]] = None,
+            periodic_dims: Optional[Union[int, Tuple[int, ...]]] = None) -> "Grid":
         """Constructs a `Grid` from a domain, shape, and boundary conditions.
 
         Args:
