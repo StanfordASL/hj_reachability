@@ -23,7 +23,7 @@ def local_lax_friedrichs(partial_max_magnitudes, states, time, values, left_grad
         jnp.maximum(jnp.max(left_grad_values, grid_axes), jnp.max(right_grad_values, grid_axes)))
     local_local_grad_value_boxes = sets.Box(jnp.minimum(left_grad_values, right_grad_values),
                                             jnp.maximum(left_grad_values, right_grad_values))
-    local_grad_value_boxes = jax.tree_multimap(
+    local_grad_value_boxes = jax.tree_map(
         lambda global_grad_value, local_local_grad_values: jax.ops.index_update(
             jnp.broadcast_to(global_grad_value, values.shape +
                              (values.ndim,) * 2), jax.ops.index[..., grid_axes, grid_axes], local_local_grad_values),
