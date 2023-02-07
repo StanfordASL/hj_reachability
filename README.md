@@ -9,9 +9,9 @@ This package is inspired by a number of related projects, including:
 - [Optimizing Dynamic Programming-Based Algorithms (`optimized_dp`, python)](https://github.com/SFU-MARS/optimized_dp)
 
 ## Installation
-To accommodate different [JAX] versions (i.e., CPU-only vs. JAX with GPU support), this package does not list JAX as a dependency in `requirements.txt`. Therefore, to use this package you must first install JAX (with your preferred accelerator support); see the [JAX installation instructions](https://github.com/google/jax#installation) for details.
+This package accommodates different [JAX] versions (i.e., CPU-only vs. JAX with GPU support); if accelerator support is desired you should first install JAX according to the relevant [installation instructions](https://github.com/google/jax#installation). A minimum JAX version requirement is listed in [`requirements.txt`](https://github.com/StanfordASL/hj_reachability/blob/main/requirements.txt), but in general this package should be compatible with the latest JAX releases (please [file an issue](https://github.com/StanfordASL/hj_reachability/issues) if you find that this is no longer the case!).
 
-Then, install this package using pip:
+If you only want CPU computation or have already installed JAX with your preferred accelerator support, you may install this package using pip:
 ```
 pip install --upgrade hj-reachability
 ```

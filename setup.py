@@ -22,6 +22,8 @@ def _parse_requirements(file):
 setuptools.setup(name="hj_reachability",
                  version=_get_version(),
                  description="Hamilton-Jacobi reachability analysis in JAX.",
+                 long_description=open("README.md").read(),
+                 long_description_content_type="text/markdown",
                  author="Ed Schmerling",
                  author_email="ednerd@gmail.com",
                  url="https://github.com/StanfordASL/hj_reachability",
@@ -29,4 +31,4 @@ setuptools.setup(name="hj_reachability",
                  packages=setuptools.find_packages(),
                  install_requires=_parse_requirements("requirements.txt"),
                  tests_require=_parse_requirements("requirements-test.txt"),
-                 python_requires=">=3.6")
+                 python_requires="~=3.7")

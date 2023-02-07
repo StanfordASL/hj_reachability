@@ -13,16 +13,6 @@ from hj_reachability.finite_differences import upwind_first
 
 from typing import Callable, Text
 
-# `contextlib.nullcontext` for Python 3.6
-if hasattr(contextlib, "nullcontext"):
-    nullcontext = contextlib.nullcontext
-else:
-
-    @contextlib.contextmanager
-    def nullcontext(enter_result=None):
-        yield enter_result
-
-
 # Hamiltonian postprocessors.
 identity = lambda *x: x[-1]  # Returns the last argument so that this may also be used as a value postprocessor.
 backwards_reachable_tube = lambda x: jnp.minimum(x, 0)
@@ -74,7 +64,8 @@ class SolverSettings:
 
 @functools.partial(jax.jit, static_argnames=("dynamics", "progress_bar"))
 def step(solver_settings, dynamics, grid, time, values, target_time, progress_bar=True):
-    with (_try_get_progress_bar(time, target_time) if progress_bar is True else nullcontext(progress_bar)) as bar:
+    with (_try_get_progress_bar(time, target_time)
+          if progress_bar is True else contextlib.nullcontext(progress_bar)) as bar:
 
         def sub_step(time_values):
             t, v = solver_settings.time_integrator(solver_settings, dynamics, grid, *time_values, target_time)
@@ -88,7 +79,8 @@ def step(solver_settings, dynamics, grid, time, values, target_time, progress_ba
 
 @functools.partial(jax.jit, static_argnames=("dynamics", "progress_bar"))
 def solve(solver_settings, dynamics, grid, times, initial_values, progress_bar=True):
-    with (_try_get_progress_bar(times[0], times[-1]) if progress_bar is True else nullcontext(progress_bar)) as bar:
+    with (_try_get_progress_bar(times[0], times[-1])
+          if progress_bar is True else contextlib.nullcontext(progress_bar)) as bar:
         make_carry_and_output_slice = lambda t, v: ((t, v), v)
         return jnp.concatenate([
             initial_values[np.newaxis],
