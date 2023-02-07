@@ -10,7 +10,7 @@ from hj_reachability.dynamics import ControlAndDisturbanceAffineDynamics, Dynami
 from hj_reachability.grid import Grid
 from hj_reachability.solver import SolverSettings, solve, step
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 __all__ = ("ControlAndDisturbanceAffineDynamics", "Dynamics", "Grid", "SolverSettings", "artificial_dissipation",
            "boundary_conditions", "finite_differences", "sets", "solve", "solver", "step", "systems",
