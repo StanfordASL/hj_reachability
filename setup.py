@@ -31,4 +31,4 @@ setuptools.setup(name="hj_reachability",
                  packages=setuptools.find_packages(),
                  install_requires=_parse_requirements("requirements.txt"),
                  tests_require=_parse_requirements("requirements-test.txt"),
-                 python_requires="~=3.7")
+                 python_requires="~=3.8")
