@@ -3,6 +3,8 @@ import abc
 from flax import struct
 import jax.numpy as jnp
 
+from hj_reachability import utils
+
 from typing import Any
 
 Array = Any
@@ -61,7 +63,7 @@ class Ball(BoundedSet):
 
     def extreme_point(self, direction: Array) -> Array:
         """Computes the point `x` in the set such that the dot product `x @ direction` is greatest."""
-        return self.center + self.radius * direction / jnp.linalg.norm(direction)
+        return self.center + self.radius * utils.unit_vector(direction)
 
     @property
     def bounding_box(self) -> "Box":
