@@ -1,6 +1,7 @@
 import functools
 
 import jax
+import jax.numpy as jnp
 import numpy as np
 
 from typing import Any, Callable, Iterable, List, Mapping, Optional, TypeVar, Union
@@ -56,3 +57,10 @@ def multivmap(fun: Callable,
     vmap_kwargs = jax.tree_util.tree_transpose(jax.tree_util.tree_structure(multivmap_kwargs), axis_sequence_structure,
                                                jax.tree_map(get_axis_sequence, multivmap_kwargs))
     return functools.reduce(lambda f, kwargs: jax.vmap(f, **kwargs), vmap_kwargs, fun)
+
+
+def unit_vector(x):
+    """Normalizes a vector `x`, returning a unit vector in the same direction, or a zero vector if `x` is zero."""
+    norm2 = jnp.sum(jnp.square(x))
+    iszero = norm2 < jnp.finfo(jnp.zeros(()).dtype).eps**2
+    return jnp.where(iszero, jnp.zeros_like(x), x / jnp.sqrt(jnp.where(iszero, 1, norm2)))
