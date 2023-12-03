@@ -119,13 +119,16 @@ class Grid:
         weight_hi = position - index_lo
         weight_lo = 1 - weight_hi
         index_lo, index_hi = tuple(
-            jnp.where(self._is_periodic_dim, index % np.array(self.shape), jnp.clip(index, 0, np.array(self.shape)))
+            jnp.where(self._is_periodic_dim, index % np.array(self.shape), jnp.clip(index, 0,
+                                                                                    np.array(self.shape) - 1))
             for index in (index_lo, index_hi))
         weight = functools.reduce(lambda x, y: x * y, jnp.ix_(*jnp.stack([weight_lo, weight_hi], -1)))
         # TODO: Double-check numerical stability here and/or switch to `tuple`s and `itertools.product` for clarity.
-        return jnp.sum(
+        result = jnp.sum(
             weight[(...,) + (np.newaxis,) * (values.ndim - self.ndim)] *
             values[jnp.ix_(*jnp.stack([index_lo, index_hi], -1))], list(range(self.ndim)))
+        return jnp.where(jnp.any(~self._is_periodic_dim & ((state < self.domain.lo) | (state > self.domain.hi))),
+                         jnp.nan, result)
 
     @property
     def _is_periodic_dim(self) -> Array:
