@@ -31,11 +31,11 @@ class Dynamics(metaclass=abc.ABCMeta):
 
     def optimal_control(self, state, time, grad_value):
         """Computes the optimal control realized by the HJ PDE Hamiltonian."""
-        return self.optimal_control_and_disturbance(self, state, time, grad_value)[0]
+        return self.optimal_control_and_disturbance(state, time, grad_value)[0]
 
     def optimal_disturbance(self, state, time, grad_value):
         """Computes the optimal disturbance realized by the HJ PDE Hamiltonian."""
-        return self.optimal_control_and_disturbance(self, state, time, grad_value)[1]
+        return self.optimal_control_and_disturbance(state, time, grad_value)[1]
 
     def hamiltonian(self, state, time, value, grad_value):
         """Evaluates the HJ PDE Hamiltonian."""
