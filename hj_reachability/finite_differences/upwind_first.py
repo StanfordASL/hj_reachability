@@ -166,7 +166,7 @@ def _diff_coefficients(k: Optional[int] = None, stencil: Optional[Array] = None)
                              f"{(k, stencil.shape[-1] - 1)}.")
     return np.linalg.solve(
         np.diff(poly.polyvander(stencil, k), axis=-2)[..., 1:].swapaxes(-1, -2),
-        np.eye(k)[(np.newaxis,) * (stencil.ndim - 1) + (0,)])
+        np.eye(k)[(np.newaxis,) * (stencil.ndim - 1) + (0, ..., np.newaxis)])[..., 0]
 
 
 def _substencil_coefficients(k: int) -> Array:
