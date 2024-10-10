@@ -1,3 +1,5 @@
+import math
+
 from absl.testing import absltest
 import jax
 import numpy as np
@@ -47,7 +49,7 @@ class UpwindFirstTest(absltest.TestCase):
                 if isinstance(i, int):
                     return x[i]
                 order = len(i) - 1
-                return np.diff(x[i], order)[0] / (np.math.factorial(order) * spacing**order)
+                return np.diff(x[i], order)[0] / (math.factorial(order) * spacing**order)
 
             v = np.array(boundary_condition(values, order))
             x = np.arange(len(v)) * spacing
