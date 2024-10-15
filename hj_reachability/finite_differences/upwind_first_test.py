@@ -37,7 +37,7 @@ class UpwindFirstTest(absltest.TestCase):
 
         values = np.random.rand(1000)
         spacing = 0.1
-        jax.tree_map(lambda x, y: np.testing.assert_allclose(x, y, atol=1e-5),
+        jax.tree.map(lambda x, y: np.testing.assert_allclose(x, y, atol=1e-5),
                      upwind_first.WENO5(values, spacing, boundary_conditions.periodic),
                      _WENO5(values, spacing, boundary_conditions.periodic))
 
@@ -79,7 +79,7 @@ class UpwindFirstTest(absltest.TestCase):
         values = np.random.rand(1000)
         spacing = 0.1
         for order in range(1, 5):
-            jax.tree_map(lambda x, y: np.testing.assert_allclose(x, y, atol=1e-5),
+            jax.tree.map(lambda x, y: np.testing.assert_allclose(x, y, atol=1e-5),
                          upwind_first.essentially_non_oscillatory(order, values, spacing, boundary_conditions.periodic),
                          _brute_force_essentially_non_oscillatory(order, values, spacing, boundary_conditions.periodic))
 
@@ -87,7 +87,7 @@ class UpwindFirstTest(absltest.TestCase):
         values = np.random.rand(1000)
         spacing = 0.1
         for eno_order in range(1, 5):
-            jax.tree_map(
+            jax.tree.map(
                 lambda x, y: np.testing.assert_allclose(x, y, atol=1e-5),
                 upwind_first.weighted_essentially_non_oscillatory(eno_order, values, spacing,
                                                                   boundary_conditions.periodic),
