@@ -52,10 +52,9 @@ def multivmap(fun: Callable,
         return axis_list
 
     multivmap_kwargs = {"in_axes": in_axes, "out_axes": in_axes if out_axes is None else out_axes}
-    axis_sequence_structure = jax.tree_util.tree_structure(
-        next(a for a in jax.tree_util.tree_leaves(in_axes) if a is not None).tolist())
-    vmap_kwargs = jax.tree_util.tree_transpose(jax.tree_util.tree_structure(multivmap_kwargs), axis_sequence_structure,
-                                               jax.tree_map(get_axis_sequence, multivmap_kwargs))
+    axis_sequence_structure = jax.tree.structure(next(a for a in jax.tree.leaves(in_axes) if a is not None).tolist())
+    vmap_kwargs = jax.tree.transpose(jax.tree.structure(multivmap_kwargs), axis_sequence_structure,
+                                     jax.tree.map(get_axis_sequence, multivmap_kwargs))
     return functools.reduce(lambda f, kwargs: jax.vmap(f, **kwargs), vmap_kwargs, fun)
 
 
